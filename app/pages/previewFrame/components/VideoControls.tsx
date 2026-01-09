@@ -60,7 +60,7 @@ export const VideoControls: React.FC<VideoControlsProps> = ({
             type="range"
             min="0"
             max={duration || 0}
-            value={currentTime}
+            value={currentTime || 0}
             onChange={(e) => onSeek(parseFloat(e.target.value))}
             className="flex-1 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer
               [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 

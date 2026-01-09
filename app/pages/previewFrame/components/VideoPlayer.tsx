@@ -4,11 +4,16 @@ import React, { useRef, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Version } from '../types';
 import { VideoControls } from './VideoControls';
+import { CompareVersionSelector } from './CompareVersionSelector';
 
 interface VideoPlayerProps {
+  leftVideoKey: number;
+  rightVideoKey: number;
   selectedVersion: Version;
   versions: Version[];
   compareMode: boolean;
+  leftWindowVersion: Version;
+  rightWindowVersion: Version;
   isPlaying: boolean;
   isMuted: boolean;
   currentTime: number;
@@ -25,12 +30,18 @@ interface VideoPlayerProps {
   onSkip: (seconds: number) => void;
   onTimeUpdate: (time: number) => void;
   onLoadedMetadata: (duration: number) => void;
+  onLeftVersionChange: (version: Version) => void;
+  onRightVersionChange: (version: Version) => void;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
+  leftVideoKey,
+  rightVideoKey,
   selectedVersion,
   versions,
   compareMode,
+  leftWindowVersion,
+  rightWindowVersion,
   isPlaying,
   isMuted,
   currentTime,
@@ -47,10 +58,37 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onSkip,
   onTimeUpdate,
   onLoadedMetadata,
+  onLeftVersionChange,
+  onRightVersionChange,
 }) => {
   const videoRef1 = useRef<HTMLVideoElement>(null);
   const videoRef2 = useRef<HTMLVideoElement>(null);
 
+  // Initialize duration when video element is ready
+  useEffect(() => {
+    const video = videoRef1.current;
+    if (video) {
+      const initDuration = () => {
+        if (video.duration && !isNaN(video.duration)) {
+          onLoadedMetadata(video.duration);
+        }
+      };
+      
+      // Try to get duration immediately if already loaded
+      initDuration();
+      
+      // Also listen for loadedmetadata event
+      video.addEventListener('loadedmetadata', initDuration);
+      video.addEventListener('durationchange', initDuration);
+      
+      return () => {
+        video.removeEventListener('loadedmetadata', initDuration);
+        video.removeEventListener('durationchange', initDuration);
+      };
+    }
+  }, [selectedVersion.url, leftWindowVersion.url, onLoadedMetadata]);
+
+  // Sync volume, mute, and playback speed
   useEffect(() => {
     if (videoRef1.current) {
       videoRef1.current.volume = volume;
@@ -64,10 +102,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   }, [volume, isMuted, playbackSpeed]);
 
+  // Sync play/pause state
   useEffect(() => {
     if (isPlaying) {
-      videoRef1.current?.play();
-      videoRef2.current?.play();
+      videoRef1.current?.play().catch(() => {});
+      videoRef2.current?.play().catch(() => {});
     } else {
       videoRef1.current?.pause();
       videoRef2.current?.pause();
@@ -75,8 +114,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [isPlaying]);
 
   const handleTimeUpdate = () => {
-    if (videoRef1.current) {
+    if (videoRef1.current && !isNaN(videoRef1.current.currentTime)) {
       onTimeUpdate(videoRef1.current.currentTime);
+      
+      // Sync second video to first video in compare mode
+      if (compareMode && videoRef2.current) {
+        const timeDiff = Math.abs(videoRef2.current.currentTime - videoRef1.current.currentTime);
+        if (timeDiff > 0.3) {
+          videoRef2.current.currentTime = videoRef1.current.currentTime;
+        }
+      }
     }
   };
 
@@ -88,8 +135,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const handleSeek = (time: number) => {
     onSeek(time);
-    if (videoRef1.current) videoRef1.current.currentTime = time;
-    if (videoRef2.current) videoRef2.current.currentTime = time;
+    if (videoRef1.current) {
+      videoRef1.current.currentTime = time;
+    }
+    if (videoRef2.current && compareMode) {
+      videoRef2.current.currentTime = time;
+    }
   };
 
   return (
@@ -105,28 +156,43 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           </button>
 
           <div className="flex-1 relative border-r-2 border-gray-800">
-            <div className={`absolute top-4 left-4 z-10 px-3 py-2 bg-blue-600/90 backdrop-blur-sm text-white rounded-lg text-sm font-medium transition-opacity duration-300 ${
+            <div className={`absolute top-4 left-4 z-10 transition-opacity duration-300 ${
               showControls ? 'opacity-100' : 'opacity-0'
             }`}>
-              v2
+              <CompareVersionSelector
+                selectedVersion={leftWindowVersion}
+                versions={versions}
+                onVersionSelect={onLeftVersionChange}
+                label="Left"
+                accentColor="blue"
+              />
             </div>
             <video
+              key={leftVideoKey}
               ref={videoRef1}
-              src={versions[0].url}
+              src={leftWindowVersion.url}
               className="w-full h-full object-contain"
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
+              onCanPlay={handleLoadedMetadata}
             />
           </div>
           <div className="flex-1 relative">
-            <div className={`absolute top-4 left-4 z-10 px-3 py-2 bg-purple-600/90 backdrop-blur-sm text-white rounded-lg text-sm font-medium transition-opacity duration-300 ${
+            <div className={`absolute top-4 left-4 z-10 transition-opacity duration-300 ${
               showControls ? 'opacity-100' : 'opacity-0'
             }`}>
-              v1
+              <CompareVersionSelector
+                selectedVersion={rightWindowVersion}
+                versions={versions}
+                onVersionSelect={onRightVersionChange}
+                label="Right"
+                accentColor="purple"
+              />
             </div>
             <video
+              key={rightVideoKey}
               ref={videoRef2}
-              src={versions[1].url}
+              src={rightWindowVersion.url}
               className="w-full h-full object-contain"
             />
           </div>
@@ -135,11 +201,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         <div className="w-full h-full flex items-center justify-center">
           {selectedVersion.type === 'video' ? (
             <video
+              key={leftVideoKey}
               ref={videoRef1}
               src={selectedVersion.url}
               className="w-full h-full object-contain"
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
+              onCanPlay={handleLoadedMetadata}
             />
           ) : (
             <img

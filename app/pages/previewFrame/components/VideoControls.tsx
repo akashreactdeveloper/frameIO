@@ -11,12 +11,14 @@ interface VideoControlsProps {
   volume: number;
   playbackSpeed: number;
   showControls: boolean;
+  markups?: Array<{ id: string; timestamp: number; color: string }>;
   onPlayPause: () => void;
   onMuteToggle: () => void;
   onSeek: (time: number) => void;
   onVolumeChange: (volume: number) => void;
   onSpeedChange: (speed: number) => void;
   onSkip: (seconds: number) => void;
+  onMarkupClick?: (markup: any) => void;
 }
 
 export const VideoControls: React.FC<VideoControlsProps> = ({
@@ -27,12 +29,14 @@ export const VideoControls: React.FC<VideoControlsProps> = ({
   volume,
   playbackSpeed,
   showControls,
+  markups = [],
   onPlayPause,
   onMuteToggle,
   onSeek,
   onVolumeChange,
   onSpeedChange,
   onSkip,
+  onMarkupClick,
 }) => {
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
 
@@ -56,22 +60,49 @@ export const VideoControls: React.FC<VideoControlsProps> = ({
       <div className="max-w-full space-y-3">
         {/* Progress Bar */}
         <div className="flex items-center gap-3">
-          <input
-            type="range"
-            min="0"
-            max={duration || 0}
-            value={currentTime || 0}
-            onChange={(e) => onSeek(parseFloat(e.target.value))}
-            className="flex-1 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer
-              [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 
-              [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer
-              [&::-webkit-slider-thumb]:shadow-lg [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 
-              [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:cursor-pointer 
-              [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:shadow-lg"
-            style={{
-              background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(currentTime / duration) * 100}%, #374151 ${(currentTime / duration) * 100}%, #374151 100%)`
-            }}
-          />
+          <div className="flex-1 relative">
+            <input
+              type="range"
+              min="0"
+              max={duration || 0}
+              value={currentTime || 0}
+              onChange={(e) => onSeek(parseFloat(e.target.value))}
+              className="flex-1 w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer
+                [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 
+                [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer
+                [&::-webkit-slider-thumb]:shadow-lg [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 
+                [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:cursor-pointer 
+                [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:shadow-lg"
+              style={{
+                background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(currentTime / duration) * 100}%, #374151 ${(currentTime / duration) * 100}%, #374151 100%)`
+              }}
+            />
+            
+            {/* Markup Indicators */}
+            {markups.map((markup) => {
+              const position = (markup.timestamp / duration) * 100;
+              return (
+                <div
+                  key={markup.id}
+                  className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full shadow-lg cursor-pointer hover:scale-150 transition-transform z-10"
+                  style={{
+                    left: `${position}%`,
+                    backgroundColor: markup.color,
+                    border: '2px solid white',
+                  }}
+                  title={`Markup at ${formatTime(markup.timestamp)}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onMarkupClick) {
+                      onMarkupClick(markup);
+                    } else {
+                      onSeek(markup.timestamp);
+                    }
+                  }}
+                />
+              );
+            })}
+          </div>
         </div>
 
         {/* Controls Row */}

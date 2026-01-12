@@ -1,17 +1,22 @@
 'use client';
 
 import React from 'react';
-import { MessageSquare, Search, Plus, MoreVertical, Send, Clock } from 'lucide-react';
+import { MessageSquare, Search, Plus, MoreVertical, Send, Clock, Eye } from 'lucide-react';
+import { Markup } from '../hooks/useMarkupTool';
+import { MarkupsList } from './MarkupsList';
 
 interface SidebarProps {
-  activeTab: 'comments' | 'fields';
+  activeTab: 'comments' | 'fields' | 'markups';
   commentText: string;
   compareMode: boolean;
   currentTime: number; // This will be the captured/frozen time
   timestampInComment: boolean;
-  onTabChange: (tab: 'comments' | 'fields') => void;
+  markups: Markup[];
+  onTabChange: (tab: 'comments' | 'fields' | 'markups') => void;
   onCommentChange: (text: string) => void;
   onCaptureTimestamp: () => void;
+  onMarkupClick: (markup: Markup) => void;
+  onMarkupDelete: (markupId: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -20,9 +25,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   compareMode,
   currentTime,
   timestampInComment,
+  markups = [], // Add default value
   onTabChange,
   onCommentChange,
   onCaptureTimestamp,
+  onMarkupClick,
+  onMarkupDelete,
 }) => {
   const formatTime = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600);
@@ -50,6 +58,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             }`}
           >
             Comments
+          </button>
+          <button
+            onClick={() => onTabChange('markups')}
+            className={`py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'markups'
+                ? 'border-blue-500 text-white'
+                : 'border-transparent text-gray-400 hover:text-white'
+            }`}
+          >
+            Markups {markups && markups.length > 0 && `(${markups.length})`}
           </button>
           <button
             onClick={() => onTabChange('fields')}
@@ -90,6 +108,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               Get Started
             </button>
           </div>
+        ) : activeTab === 'markups' ? (
+          <MarkupsList
+            markups={markups}
+            currentTime={currentTime}
+            onMarkupClick={onMarkupClick}
+            onMarkupDelete={onMarkupDelete}
+          />
         ) : (
           <div className="space-y-3">
             <div className="text-sm text-gray-400">All comments</div>

@@ -21,6 +21,8 @@ interface VideoPlayerProps {
   volume: number;
   playbackSpeed: number;
   showControls: boolean;
+  displayedMarkup: any | null;
+  markups: Array<{ id: string; timestamp: number; color: string }>;
   onExitCompare: () => void;
   onPlayPause: () => void;
   onMuteToggle: () => void;
@@ -32,6 +34,8 @@ interface VideoPlayerProps {
   onLoadedMetadata: (duration: number) => void;
   onLeftVersionChange: (version: Version) => void;
   onRightVersionChange: (version: Version) => void;
+  onVideoRefReady: (ref: HTMLVideoElement | null) => void;
+  onMarkupClick: (markup: any) => void;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -49,6 +53,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   volume,
   playbackSpeed,
   showControls,
+  displayedMarkup,
+  markups,
   onExitCompare,
   onPlayPause,
   onMuteToggle,
@@ -60,9 +66,21 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onLoadedMetadata,
   onLeftVersionChange,
   onRightVersionChange,
+  onVideoRefReady,
+  onMarkupClick,
 }) => {
   const videoRef1 = useRef<HTMLVideoElement>(null);
   const videoRef2 = useRef<HTMLVideoElement>(null);
+
+  // Notify parent component of video ref
+  useEffect(() => {
+    if (videoRef1.current) {
+      onVideoRefReady(videoRef1.current);
+    }
+    return () => {
+      onVideoRefReady(null);
+    };
+  }, [onVideoRefReady, selectedVersion.url, leftWindowVersion.url]);
 
   // Initialize duration when video element is ready
   useEffect(() => {
@@ -143,6 +161,24 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   };
 
+  // Pause and seek when markup is displayed
+  useEffect(() => {
+    if (displayedMarkup) {
+      // Pause the video
+      if (videoRef1.current) {
+        videoRef1.current.pause();
+      }
+      if (videoRef2.current) {
+        videoRef2.current.pause();
+      }
+      
+      // Seek to markup timestamp
+      if (displayedMarkup.timestamp !== undefined) {
+        handleSeek(displayedMarkup.timestamp);
+      }
+    }
+  }, [displayedMarkup]);
+
   return (
     <>
       {compareMode ? (
@@ -175,6 +211,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
               onCanPlay={handleLoadedMetadata}
+              crossOrigin="anonymous"
             />
           </div>
           <div className="flex-1 relative">
@@ -198,17 +235,34 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           </div>
         </div>
       ) : (
-        <div className="w-full h-full flex items-center justify-center">
+        <div className="w-full h-full flex items-center justify-center relative">
           {selectedVersion.type === 'video' ? (
-            <video
-              key={leftVideoKey}
-              ref={videoRef1}
-              src={selectedVersion.url}
-              className="w-full h-full object-contain"
-              onTimeUpdate={handleTimeUpdate}
-              onLoadedMetadata={handleLoadedMetadata}
-              onCanPlay={handleLoadedMetadata}
-            />
+            <>
+              <video
+                key={leftVideoKey}
+                ref={videoRef1}
+                src={selectedVersion.url}
+                className="w-full h-full object-contain"
+                onTimeUpdate={handleTimeUpdate}
+                onLoadedMetadata={handleLoadedMetadata}
+                onCanPlay={handleLoadedMetadata}
+                crossOrigin="anonymous"
+              />
+              
+              {/* Markup Thumbnail Overlay */}
+              {displayedMarkup && displayedMarkup.thumbnail && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                  <img
+                    src={displayedMarkup.thumbnail}
+                    alt="Markup preview"
+                    className="w-full h-full object-contain opacity-90"
+                  />
+                  <div className="absolute top-4 left-4 bg-purple-600/90 text-white px-3 py-1.5 rounded-lg text-sm font-medium shadow-lg">
+                    Markup Preview
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <img
               src={selectedVersion.url}
@@ -227,13 +281,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           duration={duration}
           volume={volume}
           playbackSpeed={playbackSpeed}
-          showControls={showControls}
+          showControls={showControls || displayedMarkup !== null}
+          markups={markups}
           onPlayPause={onPlayPause}
           onMuteToggle={onMuteToggle}
           onSeek={handleSeek}
           onVolumeChange={onVolumeChange}
           onSpeedChange={onSpeedChange}
           onSkip={onSkip}
+          onMarkupClick={onMarkupClick}
         />
       )}
     </>
